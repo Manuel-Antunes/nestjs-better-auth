@@ -265,7 +265,7 @@ export class BetterAuthNestWiring implements OnModuleInit {
 				await rehash(ctx.context.internalAdapter, userId, plaintext);
 			} catch (error) {
 				this.logger.warn(
-					`Could not rehash the password of user ${userId}: ${(error as Error).message}`,
+					`Could not rehash the password of user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 			return result;

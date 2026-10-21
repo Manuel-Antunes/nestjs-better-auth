@@ -26,12 +26,16 @@ export class BetterAuthSessionProvider extends AuthenticationProvider<
 	BetterAuthUser,
 	BetterAuthSession
 > {
+	private readonly trustTwoFactorEnrollment: boolean;
+
 	constructor(
 		@Inject(AuthService) private readonly authService: AuthService,
 		@Inject(MODULE_OPTIONS_TOKEN) options: AuthModuleOptions,
 		@Inject(AuthenticationRegistry) registry: AuthenticationRegistry,
 	) {
 		super();
+		this.trustTwoFactorEnrollment =
+			options.session?.trustTwoFactorEnrollment === true;
 		registry.registerProvider(this, {
 			order: options.providerOrder?.session ?? 0,
 		});
@@ -52,12 +56,15 @@ export class BetterAuthSessionProvider extends AuthenticationProvider<
 		return {
 			user: result.user as BetterAuthUser,
 			session: result.session as BetterAuthSession,
-			// Better Auth issues no session until the second factor passes, so a
-			// session whose user has 2FA enabled has passed it. This is what makes
-			// @Authenticate({ mfa: true }) work.
-			mfa: (result.user as { twoFactorEnabled?: boolean }).twoFactorEnabled
-				? "verified"
-				: undefined,
+			// A session records no proof of a second factor, and `twoFactor()` only
+			// challenges credential sign-ins: enrollment alone is not verification,
+			// unless the app opted in knowing no other sign-in method reaches
+			// these users.
+			mfa:
+				this.trustTwoFactorEnrollment &&
+				(result.user as { twoFactorEnabled?: boolean }).twoFactorEnabled
+					? "verified"
+					: undefined,
 		};
 	}
 

@@ -61,6 +61,19 @@ export type AuthModuleOptions<A = Auth> = {
 		/** `realm` of the `WWW-Authenticate` challenge. @default 'api' */
 		realm?: string;
 	};
+	/** Options of `BetterAuthSessionProvider`. Only used with `authentication: 'nestjs'`. */
+	session?: {
+		/**
+		 * Report `mfa: 'verified'` for sessions of users with two-factor enabled,
+		 * so they satisfy `@Authenticate({ mfa: true })`. Better Auth's `twoFactor()`
+		 * plugin only challenges `/sign-in/email`, `/sign-in/username` and
+		 * `/sign-in/phone-number`: a magic link, social or OAuth sign-in yields a
+		 * session without the second factor. Enable it only when those methods are
+		 * not available to users with two-factor enabled.
+		 * @default false
+		 */
+		trustTwoFactorEnrollment?: boolean;
+	};
 	disableTrustedOriginsCors?: boolean;
 	/**
 	 * @deprecated Use `bodyParser.json.enabled` and `bodyParser.urlencoded.enabled` instead.

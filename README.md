@@ -713,7 +713,7 @@ declare module '@nestjs/authentication' {
 
 ### Authentication
 
-`BetterAuthSessionProvider` registers itself in `AuthenticationRegistry` and serves the session cookie, and Bearer tokens when the `bearer()` plugin is enabled. A user with two-factor enabled counts as having passed `@Authenticate({ mfa: true })`.
+`BetterAuthSessionProvider` registers itself in `AuthenticationRegistry` and serves the session cookie, and Bearer tokens when the `bearer()` plugin is enabled. A session never satisfies `@Authenticate({ mfa: true })` by default: Better Auth records no proof of a second factor in the session, and the `twoFactor()` plugin only challenges `/sign-in/email`, `/sign-in/username` and `/sign-in/phone-number`, so magic link, social and OAuth sign-ins reach a session without it. If those methods are not available to users with two-factor enabled, set `session: { trustTwoFactorEnrollment: true }` and users with two-factor enabled count as verified.
 
 ```typescript
 import { Authenticate, CurrentSession, CurrentUser, Public } from '@nestjs/authentication';
@@ -913,6 +913,7 @@ The available options are:
 | `authentication`            | `'legacy'` | `'legacy'` uses this library's `AuthGuard` and decorators. `'nestjs'` leaves authentication to `@nestjs/authentication`'s guard, with Better Auth plugged in as credential providers. See [Using with `@nestjs/authentication` and `@nestjs/authorization`](#using-with-nestjsauthentication-and-nestjsauthorization). It is a top-level option of `forRoot()` and `forRootAsync()`. |
 | `providerOrder`             | `{ session: 0, jwt: 1, apiKey: 2 }` | With `authentication: 'nestjs'`, the position of each Better Auth credential provider in `AuthenticationRegistry`'s chain. |
 | `apiKey`                    | `{ realm: 'api' }` | With `authentication: 'nestjs'`, options of `BetterAuthApiKeyProvider`. |
+| `session`                   | `{ trustTwoFactorEnrollment: false }` | With `authentication: 'nestjs'`, options of `BetterAuthSessionProvider`. `trustTwoFactorEnrollment` reports users with two-factor enabled as having passed `@Authenticate({ mfa: true })`. |
 | `middleware`                | `undefined` | Optional middleware function that wraps the Better Auth handler. Receives `(req, res, next)` parameters. Useful for integrating with request-scoped libraries like MikroORM's RequestContext. |
 
 ### Body Parser Configuration

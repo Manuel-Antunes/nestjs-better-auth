@@ -206,12 +206,44 @@ describe("nest authentication e2e (authentication: 'nestjs')", () => {
 });
 
 describe("nest authentication e2e: MFA mapping", () => {
-	it("maps a user with two-factor enabled to a verified second factor", async () => {
+	it("does not treat two-factor enrollment as a verified second factor", async () => {
 		const auth = createNestAuth({
 			appName: "test",
 			plugins: [twoFactor()],
 		});
 		const { app } = await createNestModeApp({ auth });
+
+		try {
+			const { token, user } = await signUp(auth);
+			const ctx = await auth.$context;
+			await ctx.internalAdapter.updateUser(user.id, {
+				twoFactorEnabled: true,
+			});
+
+			const response = await request(app.getHttpServer())
+				.get("/nest/mfa")
+				.set("Authorization", `Bearer ${token}`)
+				.expect(401);
+
+			expect(response.body.error).toBe("mfa_required");
+		} finally {
+			await app.close();
+		}
+	});
+
+	it("maps enrolled users to a verified second factor with trustTwoFactorEnrollment", async () => {
+		const auth = createNestAuth({
+			appName: "test",
+			plugins: [twoFactor()],
+		});
+		const { app } = await createNestModeApp({
+			auth,
+			authModule: AuthModule.forRoot({
+				auth,
+				authentication: "nestjs",
+				session: { trustTwoFactorEnrollment: true },
+			}),
+		});
 
 		try {
 			const { token, user } = await signUp(auth);

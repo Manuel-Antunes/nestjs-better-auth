@@ -404,10 +404,9 @@ describe("nest handlers e2e: PasswordHasher bridge", () => {
 				accountId: user.id,
 				password: await hashPassword(password),
 			});
-			// The rehash will fail: the sign-in must still succeed.
-			vi.spyOn(ctx.internalAdapter, "updatePassword").mockRejectedValue(
-				new Error("database is read-only"),
-			);
+			// The rehash will fail, with a non-Error value even: the sign-in must
+			// still succeed and logging the failure must not throw.
+			vi.spyOn(ctx.internalAdapter, "updatePassword").mockRejectedValue(null);
 
 			const response = await request(server.app.getHttpServer())
 				.post("/api/auth/sign-in/email")
