@@ -666,6 +666,219 @@ export class UserController {
 }
 ```
 
+## Using with `@nestjs/authentication` and `@nestjs/authorization`
+
+NestJS has official security packages: [`@nestjs/authentication`](https://docs.nestjs.com/security/authentication) and [`@nestjs/authorization`](https://docs.nestjs.com/security/authorization). With `authentication: 'nestjs'`, this library becomes an **adapter**: Better Auth stays the engine and the store, and plugs into the ports Nest provides. The Nest guard, decorators and `AuthenticationContext` then work as the Nest docs describe, and Better Auth's access control backs your `@Policy()` classes.
+
+Both packages are optional peer dependencies, and the adapters live behind subpath exports, so existing apps (`authentication: 'legacy'`, the default) don't pull them in.
+
+```bash
+npm install @nestjs/authentication @nestjs/authorization
+```
+
+### Setup
+
+```typescript
+import { Module } from '@nestjs/common';
+import { AuthenticationModule } from '@nestjs/authentication';
+import { AuthorizationModule } from '@nestjs/authorization';
+import { AuthModule } from '@thallesp/nestjs-better-auth';
+import { BetterAuthAuthenticationModule } from '@thallesp/nestjs-better-auth/authentication';
+import { BetterAuthAuthorizationModule } from '@thallesp/nestjs-better-auth/authorization';
+
+@Module({
+  imports: [
+    // Order matters: authentication's global guard must run before authorization's.
+    AuthenticationModule.forRoot(),
+    AuthorizationModule.forRoot(),
+    AuthModule.forRoot({ auth, authentication: 'nestjs' }),
+    BetterAuthAuthenticationModule, // the credential providers and handler wiring
+    BetterAuthAuthorizationModule, // only for the Roles/OrgRoles/... decorators below
+  ],
+})
+export class AppModule {}
+```
+
+`authentication: 'nestjs'` does **not** register this library's `AuthGuard` (`AuthenticationModule` registers `AuthenticationGuard`), and fails at startup when `BetterAuthAuthenticationModule` is not imported. Better Auth's own routes (`/api/auth/*`) stay outside the guard.
+
+Type `@CurrentUser()` and `@CurrentSession()` once:
+
+```typescript
+import type { BetterAuthAuthenticationTypes } from '@thallesp/nestjs-better-auth';
+
+declare module '@nestjs/authentication' {
+  interface AuthenticationTypes extends BetterAuthAuthenticationTypes<typeof auth> {}
+}
+```
+
+### Authentication
+
+`BetterAuthSessionProvider` registers itself in `AuthenticationRegistry` and serves the session cookie, and Bearer tokens when the `bearer()` plugin is enabled. A user with two-factor enabled counts as having passed `@Authenticate({ mfa: true })`.
+
+```typescript
+import { Authenticate, CurrentSession, CurrentUser, Public } from '@nestjs/authentication';
+
+@Controller('posts')
+export class PostsController {
+  @Public()
+  @Get()
+  list() {}
+
+  @Authenticate({ verifiedEmail: true })
+  @Post()
+  create(@CurrentUser() user: User, @CurrentSession() session: Session) {}
+}
+```
+
+| Better Auth                                                          | Nest port                                                | Adapter                                                                 |
+| -------------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| session cookie, `bearer()`                                           | `AuthenticationProvider`                                 | `BetterAuthSessionProvider`                                             |
+| `apiKey()` (`@better-auth/api-key`)                                  | `ApiKeyProvider`                                         | `BetterAuthApiKeyProvider`, registered only when the plugin is present  |
+| `jwt()`                                                              | `AuthenticationProvider` (`Authorization: Bearer <jwt>`) | `BetterAuthJwtProvider`, registered only when the plugin is present     |
+| `sendResetPassword`, `sendVerificationEmail`, `magicLink()`          | `PasswordResetHandler`, `EmailVerificationHandler`, `MagicLinkHandler` | handlers found in your providers are wired into Better Auth |
+| social providers, `genericOAuth()`                                   | `OidcAccountResolver`                                    | resolver found in your providers decides account links                  |
+| `emailAndPassword.password`                                          | `PasswordHasher`                                         | `betterAuthPassword(hasher)` / `nestPasswordHasher()`                   |
+
+The legacy names are available as aliases from `@thallesp/nestjs-better-auth/authentication`: `AllowAnonymous` is `@Public()`, `OptionalAuth` is `@Authenticate({ optional: true })`, and `Session` returns `{ user, session }`.
+
+#### API keys
+
+With the `apiKey()` plugin, requests carrying the plugin's header (`x-api-key` by default) are authenticated by `BetterAuthApiKeyProvider`, which extends `ApiKeyProvider` and delegates the whole check to `verifyApiKey` (rate limits, remaining counts and permissions still apply). `@CurrentSession()` is `{ method: 'api-key', keyId }`, and a key never satisfies `@Authenticate({ mfa: true })`. Only keys owned by a user are supported. Leave `enableSessionForAPIKeys` off, or `getSession()` turns a key into a regular session before this provider sees it.
+
+#### Email handlers and OIDC
+
+Extend Nest's `PasswordResetHandler`, `EmailVerificationHandler`, `MagicLinkHandler` or `OidcAccountResolver` and provide the class in any module. The library finds it (like `@Hook()` providers) and wires it into Better Auth; you don't configure Nest's own stores for these features. Only `send()` (and `resolveUser()` for OIDC) is used.
+
+- The parent config must exist (`emailAndPassword: { enabled: true }`, `emailVerification: {}`, `databaseHooks: {}` for OIDC), otherwise the library fails at startup and tells you what to add.
+- A Nest handler **replaces** the callback the config defines (and logs which one). They aren't composed, because that would send two emails.
+- `magicLink()` requires `sendMagicLink`, so pass the placeholder `fromNestHandler`.
+
+```typescript
+import { fromNestHandler } from '@thallesp/nestjs-better-auth/authentication';
+
+betterAuth({ plugins: [magicLink({ sendMagicLink: fromNestHandler })] });
+```
+
+#### Password hashing
+
+Hash Better Auth passwords with Nest's `PasswordHasher` (scrypt, constant-time checks, length limits). Hashes Better Auth wrote before (`salt:key`) keep verifying, and are rehashed on sign-in when `hooks: {}` is configured.
+
+```typescript
+import { betterAuthPassword, nestPasswordHasher } from '@thallesp/nestjs-better-auth/authentication';
+
+// forRootAsync: inject the hasher
+AuthModule.forRootAsync({
+  authentication: 'nestjs',
+  inject: [PasswordHasher],
+  useFactory: (hasher: PasswordHasher) => ({
+    auth: betterAuth({ emailAndPassword: { enabled: true, password: betterAuthPassword(hasher) } }),
+  }),
+});
+
+// forRoot: Better Auth captures the functions when it starts, so declare a placeholder
+// that BetterAuthAuthenticationModule binds to the injected PasswordHasher
+betterAuth({ emailAndPassword: { enabled: true, password: nestPasswordHasher() } });
+```
+
+### Authorization with Better Auth access control
+
+`BetterAuthACPolicy()` and `BetterAuthOrganizationACPolicy()` produce `@nestjs/authorization` policies backed by the `admin()` and `organization()` plugins. You describe the resource once; `BetterAuthAccessControl` **discovers** the policies and builds the `ac` and `roles` Better Auth needs.
+
+```typescript
+import { Policy } from '@nestjs/authorization';
+import {
+  BetterAuthACPolicy,
+  BetterAuthOrganizationACPolicy,
+} from '@thallesp/nestjs-better-auth/authorization';
+
+@Policy()
+export class PostPolicy extends BetterAuthACPolicy<Roles, Operations>({
+  resource: 'post',
+  actions: Object.values(Operations),
+  wildcard: Operations.MANAGE, // optional: "manage" grants every action of this resource
+  statements: {
+    [Roles.ADMIN]: [Operations.MANAGE],
+    [Roles.USER]: [Operations.CREATE],
+  },
+}) {}
+
+@Policy()
+export class PostOrganizationPolicy extends BetterAuthOrganizationACPolicy<Roles, Operations>({
+  resource: 'post',
+  actions: Object.values(Operations),
+  statements: { [Roles.OWNER]: [Operations.MANAGE], [Roles.MEMBER]: [Operations.CREATE] },
+}) {}
+```
+
+```typescript
+import { AuthModule, BetterAuthAccessControl } from '@thallesp/nestjs-better-auth';
+
+AuthModule.forRootAsync({
+  authentication: 'nestjs',
+  inject: [BetterAuthAccessControl],
+  useFactory: (accessControl: BetterAuthAccessControl) => ({
+    auth: betterAuth({
+      plugins: [
+        admin(accessControl.admin()), // { ac, roles }, keeping Better Auth's own statements
+        organization(accessControl.organization()),
+      ],
+    }),
+  }),
+});
+```
+
+```typescript
+import { Can } from '@nestjs/authorization';
+import { activeOrganization } from '@thallesp/nestjs-better-auth/authorization';
+
+@Post()
+@Can(PostPolicy, 'create') // type-checked: 'create' | 'update' | 'manage'
+create() {}
+
+// Policies are singletons, so the organization reaches the ability as an argument:
+@Post('/org/posts')
+@Can(PostOrganizationPolicy, 'create', activeOrganization) // the session's active organization
+createInActiveOrg() {}
+
+@Post('/orgs/:organizationId/posts')
+@Can(PostOrganizationPolicy, 'create', (ctx) => [ctx.switchToHttp().getRequest().params.organizationId])
+createInOrg() {}
+```
+
+Generated abilities are ordinary members of the policy, so you can layer record-level rules on top of the role check with `checkPermission`:
+
+```typescript
+@Policy()
+export class PostPolicy extends BetterAuthACPolicy<Roles, Operations>({ /* ... */ }) {
+  // Authors may always edit their own posts; everyone else needs the 'update' permission.
+  override update = async (user: BetterAuthUser | null, post?: Post) => {
+    if (user && post?.authorId === user.id) return true;
+    return this.checkPermission(user, Operations.UPDATE);
+  };
+}
+```
+
+Notes:
+
+- One policy per resource and scope. Two policies for the same resource fail at startup.
+- Policies are discovered when the `forRootAsync()` factory runs, so a policy in a lazily loaded module isn't seen.
+- Organization checks use the member's role and merge roles stored with `dynamicAccessControl`. They need no request headers, so `AuthorizationService.can()` works in queue workers (pass the `organizationId` explicitly).
+- Importing `AuthorizationModule` denies every handler without `@Can()`, `@Can.Anyone()` or `@Public()`. That is Nest's behavior.
+- `ac` and `roles` are built at runtime, so the client plugins' `checkRolePermission` can't import them. Use the server-side check, or share your own static definition.
+
+#### Replacing the legacy decorators
+
+`@Roles()`, `@OrgRoles()`, `@RequireActiveOrg()`, `@UserHasPermission()` and `@MemberHasPermission()` are read by this library's `AuthGuard`. In `'nestjs'` mode use the `@Can()`-based versions from `@thallesp/nestjs-better-auth/authorization` (same names and options) and import `BetterAuthAuthorizationModule`, which provides the policy behind them.
+
+### Migrating
+
+1. Install the two Nest packages and import `AuthenticationModule` (and `AuthorizationModule`) before `AuthModule`.
+2. Add `authentication: 'nestjs'` and import `BetterAuthAuthenticationModule`.
+3. Switch the decorator imports to Nest's (or the aliases above). `@Hook()`, `@DatabaseHook()` and the other Better Auth hooks are unchanged.
+4. If you import `AuthorizationModule`, give every handler a `@Can()`, `@Can.Anyone()` or `@Public()`.
+
+Both `@nestjs/authentication` and `@nestjs/authorization` are `0.x`: this library is tested against `^0.1`.
+
 ## Module Options
 
 When configuring `AuthModule.forRoot()`, you can provide options to customize the behavior:
@@ -683,6 +896,7 @@ AuthModule.forRoot({
   enableRawBodyParser: false,
   disableGlobalAuthGuard: false,
   disableControllers: false,
+  authentication: 'legacy',
 });
 ```
 
@@ -696,6 +910,9 @@ The available options are:
 | `enableRawBodyParser`       | `false` | Deprecated. Use `bodyParser.rawBody` instead. When set to `true`, enables raw body parsing and attaches the raw buffer to `req.rawBody`. |
 | `disableGlobalAuthGuard`    | `false` | When set to `true`, does not register `AuthGuard` as a global guard. Use this if you prefer to apply `AuthGuard` manually or register it yourself via `APP_GUARD`.       |
 | `disableControllers`        | `false` | When set to `true`, does not register any controllers. Use this if you want to handle routes manually.                                                                   |
+| `authentication`            | `'legacy'` | `'legacy'` uses this library's `AuthGuard` and decorators. `'nestjs'` leaves authentication to `@nestjs/authentication`'s guard, with Better Auth plugged in as credential providers. See [Using with `@nestjs/authentication` and `@nestjs/authorization`](#using-with-nestjsauthentication-and-nestjsauthorization). It is a top-level option of `forRoot()` and `forRootAsync()`. |
+| `providerOrder`             | `{ session: 0, jwt: 1, apiKey: 2 }` | With `authentication: 'nestjs'`, the position of each Better Auth credential provider in `AuthenticationRegistry`'s chain. |
+| `apiKey`                    | `{ realm: 'api' }` | With `authentication: 'nestjs'`, options of `BetterAuthApiKeyProvider`. |
 | `middleware`                | `undefined` | Optional middleware function that wraps the Better Auth handler. Receives `(req, res, next)` parameters. Useful for integrating with request-scoped libraries like MikroORM's RequestContext. |
 
 ### Body Parser Configuration

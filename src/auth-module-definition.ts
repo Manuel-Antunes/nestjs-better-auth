@@ -40,8 +40,27 @@ export type AuthModuleMiddleware = (
 	next: (error?: unknown) => void,
 ) => void | Promise<void>;
 
+export type AuthModuleProviderOrder = {
+	/** Order of `BetterAuthSessionProvider` in the `AuthenticationRegistry` chain. @default 0 */
+	session?: number;
+	/** Order of `BetterAuthJwtProvider` in the chain. @default 1 */
+	jwt?: number;
+	/** Order of `BetterAuthApiKeyProvider` in the chain. @default 2 */
+	apiKey?: number;
+};
+
 export type AuthModuleOptions<A = Auth> = {
 	auth: A;
+	/**
+	 * Order of each Better Auth credential provider in `@nestjs/authentication`'s
+	 * chain. Only used with `authentication: 'nestjs'`.
+	 */
+	providerOrder?: AuthModuleProviderOrder;
+	/** Options of `BetterAuthApiKeyProvider`. Only used with `authentication: 'nestjs'`. */
+	apiKey?: {
+		/** `realm` of the `WWW-Authenticate` challenge. @default 'api' */
+		realm?: string;
+	};
 	disableTrustedOriginsCors?: boolean;
 	/**
 	 * @deprecated Use `bodyParser.json.enabled` and `bodyParser.urlencoded.enabled` instead.
@@ -57,6 +76,16 @@ export type AuthModuleOptions<A = Auth> = {
 
 export const MODULE_OPTIONS_TOKEN = Symbol("AUTH_MODULE_OPTIONS");
 
+/**
+ * How requests are authenticated:
+ * - `'legacy'`: this library's own `AuthGuard` and decorators.
+ * - `'nestjs'`: `@nestjs/authentication`'s guard, with Better Auth plugged in
+ *   as credential providers (see `BetterAuthAuthenticationModule`).
+ */
+export type AuthenticationMode = "legacy" | "nestjs";
+
+export const AUTHENTICATION_MODE_TOKEN = Symbol("AUTH_AUTHENTICATION_MODE");
+
 export const { ConfigurableModuleClass, OPTIONS_TYPE, ASYNC_OPTIONS_TYPE } =
 	new ConfigurableModuleBuilder<AuthModuleOptions>({
 		optionsInjectionToken: MODULE_OPTIONS_TOKEN,
@@ -67,6 +96,7 @@ export const { ConfigurableModuleClass, OPTIONS_TYPE, ASYNC_OPTIONS_TYPE } =
 				isGlobal: true,
 				disableGlobalAuthGuard: false,
 				disableControllers: false,
+				authentication: "legacy" as AuthenticationMode,
 			},
 			(def, extras) => {
 				return {

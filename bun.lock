@@ -8,9 +8,12 @@
         "@apollo/server": "^5.0.0",
         "@as-integrations/express5": "^1.1.2",
         "@as-integrations/fastify": "^3.1.0",
+        "@better-auth/api-key": "1.5.4",
         "@biomejs/biome": "2.2.4",
         "@faker-js/faker": "^10.0.0",
         "@nestjs/apollo": "^14.0.0",
+        "@nestjs/authentication": "^0.1.1",
+        "@nestjs/authorization": "^0.1.0",
         "@nestjs/common": "^12.0.1",
         "@nestjs/core": "^12.0.1",
         "@nestjs/graphql": "^14.0.0",
@@ -109,6 +112,8 @@
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
+
+    "@better-auth/api-key": ["@better-auth/api-key@1.5.4", "", { "dependencies": { "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/core": "1.5.4", "@better-auth/utils": "0.3.1", "better-auth": "1.5.4" } }, "sha512-McV2I4E8cR+jIYjIXy8hfhZg5EKOIPooAZSt78m5RvtLzYRcl4JKJbtKCh/au7zIh47yT+EcxM9pmL9/WigDcA=="],
 
     "@better-auth/core": ["@better-auth/core@1.5.4", "", { "dependencies": { "@standard-schema/spec": "^1.1.0", "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/utils": "0.3.1", "@better-fetch/fetch": "1.1.21", "@cloudflare/workers-types": ">=4", "better-call": "1.3.2", "jose": "^6.1.0", "kysely": "^0.28.5", "nanostores": "^1.0.1" }, "optionalPeers": ["@cloudflare/workers-types"] }, "sha512-k5AdwPRQETZn0vdB60EB9CDxxfllpJXKqVxTjyXIUSRz7delNGlU0cR/iRP3VfVJwvYR1NbekphBDNo+KGoEzQ=="],
 
@@ -299,6 +304,10 @@
     "@napi-rs/nice-win32-x64-msvc": ["@napi-rs/nice-win32-x64-msvc@1.1.1", "", { "os": "win32", "cpu": "x64" }, "sha512-vB+4G/jBQCAh0jelMTY3+kgFy00Hlx2f2/1zjMoH821IbplbWZOkLiTYXQkygNTzQJTq5cvwBDgn2ppHD+bglQ=="],
 
     "@nestjs/apollo": ["@nestjs/apollo@14.0.0", "", { "dependencies": { "iterall": "1.3.0", "lodash.omit": "4.18.0", "tslib": "2.8.1" }, "peerDependencies": { "@apollo/gateway": "^2.0.0", "@apollo/server": "^5.0.0", "@apollo/subgraph": "^2.0.0", "@as-integrations/express5": "*", "@as-integrations/fastify": "^2.1.1 || ^3.0.0", "@nestjs/common": "^12.0.0", "@nestjs/core": "^12.0.0", "@nestjs/graphql": "^14.0.0", "graphql": "^16.10.0 || ^17.0.0" }, "optionalPeers": ["@apollo/gateway", "@apollo/subgraph", "@as-integrations/express5", "@as-integrations/fastify"] }, "sha512-+zui1iiSozGJX1X2rMSS01H9v18nZh1fgFBIdV6pAIzz9iRJCCLshnEbcWTTePYBbKyDguMKjqykBW2HF0vrbw=="],
+
+    "@nestjs/authentication": ["@nestjs/authentication@0.1.1", "", { "peerDependencies": { "@nestjs/common": "^12.0.0", "@nestjs/core": "^12.0.0", "@nestjs/microservices": "^12.0.0", "@nestjs/websockets": "^12.0.0", "reflect-metadata": "^0.1.13 || ^0.2.0", "rxjs": "^7.1.0" }, "optionalPeers": ["@nestjs/microservices", "@nestjs/websockets"] }, "sha512-WHwFJ31+5rnL8iSMgptzrfGDC84b4neLK32laI486M+LrMyxWorYDx5/gBAmPlop1fI+ZKkyb2Flz+D4VxfxNg=="],
+
+    "@nestjs/authorization": ["@nestjs/authorization@0.1.0", "", { "peerDependencies": { "@nestjs/authentication": ">=0.1.0", "@nestjs/common": "^12.0.0", "@nestjs/core": "^12.0.0", "@nestjs/microservices": "^12.0.0", "@nestjs/websockets": "^12.0.0", "reflect-metadata": "^0.1.13 || ^0.2.0", "rxjs": "^7.1.0" }, "optionalPeers": ["@nestjs/authentication", "@nestjs/microservices", "@nestjs/websockets"] }, "sha512-8NWu3rvl8ejxG/KuwNvTv+Mxg6lirrfRP7Ja5PLQU55dDvgwyvb+Kb0FxOOqipYYtSUan/buFgNHzTKtZwpYGQ=="],
 
     "@nestjs/common": ["@nestjs/common@12.0.1", "", { "dependencies": { "@standard-schema/spec": "1.1.0", "file-type": "22.0.2", "iterare": "1.2.1", "load-esm": "1.0.3", "tslib": "2.8.1", "uid": "2.0.2" }, "peerDependencies": { "class-transformer": ">=0.4.1", "class-validator": ">=0.13.2", "reflect-metadata": "^0.1.12 || ^0.2.0", "rxjs": "^7.1.0" }, "optionalPeers": ["class-transformer", "class-validator"] }, "sha512-v0zTaRCTV2K2xSnb3GnJoQKtaR6VxouJtm+P2gpr5w61dlXeWpXl1WVknCSzUqx2QwTV10tBkHETxvQvkf2Exg=="],
 

@@ -4,6 +4,7 @@ import type {
 	MiddlewareConsumer,
 	NestModule,
 	OnModuleInit,
+	Provider,
 } from "@nestjs/common";
 import {
 	ApplicationConfig,
@@ -11,6 +12,7 @@ import {
 	DiscoveryService,
 	HttpAdapterHost,
 	MetadataScanner,
+	ModuleRef,
 } from "@nestjs/core";
 import { toNodeHandler } from "better-auth/node";
 import { createAuthMiddleware } from "better-auth/api";
@@ -18,9 +20,12 @@ import type {
 	Request as ExpressRequest,
 	Response as ExpressResponse,
 } from "express";
+import { BetterAuthAccessControl } from "./access-control.ts";
 import {
 	type ASYNC_OPTIONS_TYPE,
+	AUTHENTICATION_MODE_TOKEN,
 	type AuthModuleOptions,
+	type AuthenticationMode,
 	ConfigurableModuleClass,
 	MODULE_OPTIONS_TOKEN,
 	type OPTIONS_TYPE,
@@ -42,6 +47,7 @@ import {
 	BEFORE_HOOK_KEY,
 	DATABASE_HOOK_KEY,
 	HOOK_KEY,
+	NEST_ADAPTERS_MARKER,
 } from "./symbols.ts";
 import type { DatabaseHookModel, DatabaseHookOperation } from "./decorators.ts";
 import { AuthGuard } from "./auth-guard.ts";
@@ -79,8 +85,8 @@ export type Auth = any;
  */
 @Module({
 	imports: [DiscoveryModule],
-	providers: [AuthService],
-	exports: [AuthService],
+	providers: [AuthService, BetterAuthAccessControl],
+	exports: [AuthService, BetterAuthAccessControl],
 })
 export class AuthModule
 	extends ConfigurableModuleClass
@@ -100,6 +106,10 @@ export class AuthModule
 		private readonly adapter: HttpAdapterHost,
 		@Inject(MODULE_OPTIONS_TOKEN)
 		private readonly options: AuthModuleOptions,
+		@Inject(AUTHENTICATION_MODE_TOKEN)
+		private readonly authenticationMode: AuthenticationMode,
+		@Inject(ModuleRef)
+		private readonly moduleRef: ModuleRef,
 	) {
 		super();
 
@@ -121,6 +131,8 @@ export class AuthModule
 	}
 
 	onModuleInit(): void {
+		this.assertNestAdapters();
+
 		const hookProviders = this.discoveryService
 			.getProviders()
 			.filter(
@@ -177,6 +189,25 @@ export class AuthModule
 				this.setupDatabaseHooks(providerMethod, provider.instance);
 			}
 		}
+	}
+
+	/**
+	 * With `authentication: 'nestjs'` the legacy guard is not registered, so
+	 * without the adapters nothing would authenticate: fail at startup instead.
+	 */
+	private assertNestAdapters(): void {
+		if (this.authenticationMode !== "nestjs") return;
+
+		let adapters: unknown;
+		try {
+			adapters = this.moduleRef.get(NEST_ADAPTERS_MARKER, { strict: false });
+		} catch {
+			adapters = undefined;
+		}
+		if (!adapters)
+			throw new Error(
+				"AuthModule was configured with authentication: 'nestjs' but BetterAuthAuthenticationModule is not imported. Import it from '@thallesp/nestjs-better-auth/authentication' (and AuthenticationModule from '@nestjs/authentication').",
+			);
 	}
 
 	configure(consumer: MiddlewareConsumer): void {
@@ -349,14 +380,10 @@ export class AuthModule
 				: forRootAsyncResult.controllers,
 			providers: [
 				...(forRootAsyncResult.providers ?? []),
-				...(!options.disableGlobalAuthGuard
-					? [
-							{
-								provide: APP_GUARD,
-								useClass: AuthGuard,
-							},
-						]
-					: []),
+				...authenticationProviders(
+					options.authentication,
+					options.disableGlobalAuthGuard,
+				),
 			],
 		};
 	}
@@ -391,17 +418,29 @@ export class AuthModule
 				: forRootResult.controllers,
 			providers: [
 				...(forRootResult.providers ?? []),
-				...(!normalizedOptions.disableGlobalAuthGuard
-					? [
-							{
-								provide: APP_GUARD,
-								useClass: AuthGuard,
-							},
-						]
-					: []),
+				...authenticationProviders(
+					normalizedOptions.authentication,
+					normalizedOptions.disableGlobalAuthGuard,
+				),
 			],
 		};
 	}
+}
+
+/**
+ * In `'nestjs'` mode `AuthenticationModule` registers the global guard, so the
+ * legacy `AuthGuard` is left out.
+ */
+function authenticationProviders(
+	authentication: AuthenticationMode = "legacy",
+	disableGlobalAuthGuard = false,
+): Provider[] {
+	return [
+		{ provide: AUTHENTICATION_MODE_TOKEN, useValue: authentication },
+		...(authentication === "legacy" && !disableGlobalAuthGuard
+			? [{ provide: APP_GUARD, useClass: AuthGuard }]
+			: []),
+	];
 }
 
 class AuthModuleWithoutControllers extends AuthModule {
