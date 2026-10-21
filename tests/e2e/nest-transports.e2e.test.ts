@@ -9,6 +9,7 @@ import {
 	signUp,
 } from "../shared/nest-mode.ts";
 
+/** Resolves with the payload of the next `event` on `socket`. */
 const waitFor = (socket: Socket, event: string) =>
 	new Promise<unknown>((resolve) => socket.once(event, resolve));
 
@@ -24,7 +25,6 @@ describe("nest authentication e2e: GraphQL and WebSockets", () => {
 			providers: [NestAuthResolver, NestAuthGateway],
 			withGraphql: true,
 		});
-		await setup.app.listen(0);
 		port = setup.app.getHttpServer().address()?.port;
 	});
 
@@ -37,6 +37,7 @@ describe("nest authentication e2e: GraphQL and WebSockets", () => {
 		await setup.app.close();
 	});
 
+	/** Posts a GraphQL query, authenticated when a token is given. */
 	const graphql = (query: string, token?: string) => {
 		const req = request(setup.app.getHttpServer())
 			.post("/graphql")
@@ -69,6 +70,7 @@ describe("nest authentication e2e: GraphQL and WebSockets", () => {
 	});
 
 	describe("websockets", () => {
+		/** Connects a socket to the test gateway, authenticated when a token is given. */
 		const connect = async (token?: string) => {
 			socket = ioc(`http://localhost:${port}/test`, {
 				path: "/ws",

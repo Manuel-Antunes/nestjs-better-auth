@@ -38,15 +38,29 @@ import { createTestNestApplication } from "./test-utils.ts";
 
 type BetterAuthOptions = Parameters<typeof betterAuth>[0];
 
+/**
+ * Cheap stand-in for scrypt: most suites create dozens of users and don't
+ * test passwords, and hashing them for real makes the suite CPU bound (and
+ * flaky on small CI machines). Suites about hashing pass their own
+ * `emailAndPassword`.
+ */
+const fastPassword = {
+	hash: async (password: string) => `plain:${password}`,
+	verify: async ({ hash, password }: { hash: string; password: string }) =>
+		hash === `plain:${password}`,
+};
+
+/** A Better Auth instance with the bearer plugin, plus any `plugins` of `options`. */
 export function createNestAuth(options?: Partial<BetterAuthOptions>) {
 	return betterAuth({
 		basePath: "/api/auth",
-		emailAndPassword: { enabled: true },
+		emailAndPassword: { enabled: true, password: fastPassword },
 		...options,
 		plugins: [bearer(), ...(options?.plugins ?? [])],
 	});
 }
 
+/** Routes exercising `@nestjs/authentication`'s decorators and this library's aliases. */
 @Controller("nest")
 export class NestAuthController {
 	constructor(private readonly context: AuthenticationContext) {}
@@ -124,6 +138,7 @@ export class NestAuthController {
 	}
 }
 
+/** GraphQL resolver for the `authentication: 'nestjs'` tests. */
 @Resolver()
 export class NestAuthResolver {
 	@AllowAnonymous()
@@ -138,6 +153,7 @@ export class NestAuthResolver {
 	}
 }
 
+/** WebSocket gateway for the `authentication: 'nestjs'` tests. */
 @WebSocketGateway({ path: "/ws", namespace: "test", cors: { origin: "*" } })
 export class NestAuthGateway {
 	@AllowAnonymous()
@@ -164,6 +180,7 @@ export interface NestModeAppOptions {
 	withGraphql?: boolean;
 }
 
+/** Builds an app with `AuthenticationModule`, `AuthModule` in `'nestjs'` mode and `BetterAuthAuthenticationModule`. */
 export async function createNestModeApp(options: NestModeAppOptions) {
 	const { auth } = options;
 
@@ -198,13 +215,21 @@ export async function createNestModeApp(options: NestModeAppOptions) {
 		imports: [AppModule],
 	}).compile();
 	const app: INestApplication = await createTestNestApplication(moduleRef);
+	// Listen once, on the wildcard address like the other suites: for a server
+	// that isn't listening, supertest calls listen(0) and close() around every
+	// request, and that churn of ephemeral ports makes long suites flaky. A
+	// specific address (127.0.0.1) would not do: on macOS it can share a port
+	// with another process's wildcard listener and steal its connections.
+	await app.listen(0);
 
 	return { app, auth, moduleRef };
 }
 
 let counter = 0;
+/** An email address no earlier test used. */
 export const uniqueEmail = () => `user-${Date.now()}-${counter++}@example.com`;
 
+/** Signs up a user with a fresh email, returning Better Auth's result (with the bearer token). */
 export async function signUp(auth: ReturnType<typeof createNestAuth>) {
 	return auth.api.signUpEmail({
 		body: {
@@ -215,6 +240,7 @@ export async function signUp(auth: ReturnType<typeof createNestAuth>) {
 	});
 }
 
+/** Marks the user's email as verified. */
 export async function verifyEmail(
 	auth: ReturnType<typeof createNestAuth>,
 	userId: string,

@@ -121,12 +121,14 @@ export class BetterAuthApiKeyProvider extends ApiKeyProvider<BetterAuthUser> {
 		);
 	}
 
+	/** Keys are created with Better Auth's `createApiKey()`: it owns the key format. */
 	override generate(): never {
 		throw new Error(
 			"Create keys with AuthService.api.createApiKey(): Better Auth owns the key format.",
 		);
 	}
 
+	/** `WWW-Authenticate` challenge sent with a 401 when no provider found credentials. */
 	override challenge(): string {
 		return `ApiKey realm="${this.apiRealm}"`;
 	}

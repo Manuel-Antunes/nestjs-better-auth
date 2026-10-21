@@ -116,6 +116,7 @@ describe("nest authentication e2e: api key", () => {
 			.expect(401);
 	});
 
+	/** A bearer token for an existing user. */
 	async function signInToken(email: string) {
 		const result = await setup.auth.api.signInEmail({
 			body: { email, password: "password-123456" },
@@ -142,6 +143,7 @@ describe("nest authentication e2e: jwt", () => {
 
 	const server = () => setup.app.getHttpServer();
 
+	/** A JWT issued by the `jwt()` plugin for the session behind `token`. */
 	const getToken = (token: string | null): Promise<{ token: string }> =>
 		// biome-ignore lint/suspicious/noExplicitAny: the jwt endpoints are not typed on the generic auth instance
 		(setup.auth.api as any).getToken({

@@ -5,6 +5,7 @@ import { findPlugin } from "../authentication/utils.ts";
 // biome-ignore lint/suspicious/noExplicitAny: the organization plugin's option types vary by configuration
 type OrganizationOptions = any;
 
+/** Better Auth's context and the `organization()` plugin's options. */
 async function organizationContext(authService: AuthService) {
 	const ctx = await authService.instance.$context;
 	const options: OrganizationOptions =

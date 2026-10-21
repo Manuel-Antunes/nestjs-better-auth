@@ -35,6 +35,7 @@ import {
 } from "../shared/nest-policies.ts";
 import { betterAuth } from "better-auth";
 
+/** Routes protected with `@Can()` and generated policies. */
 @Controller("posts")
 class PostsController {
 	constructor(private readonly authorization: AuthorizationService) {}
@@ -106,6 +107,7 @@ class PostsController {
 	}
 }
 
+/** Routes protected with the `@Can()`-based Roles, OrgRoles and permission decorators. */
 @Controller("builtin")
 class BuiltInController {
 	@Get("roles")
@@ -179,6 +181,7 @@ describe("nest authorization e2e: Better Auth access control policies", () => {
 	// biome-ignore lint/suspicious/noExplicitAny: plugin endpoints are not typed on the generic auth instance
 	const api = () => auth.api as any;
 
+	/** Creates a user with `role` through the admin plugin and signs them in. */
 	async function userWithRole(role: string) {
 		const password = "password-123456";
 		const { user } = await api().createUser({
@@ -190,6 +193,7 @@ describe("nest authorization e2e: Better Auth access control policies", () => {
 		return { user: user as BetterAuthUser, token: token as string };
 	}
 
+	/** Headers carrying a bearer token, for server-side API calls on behalf of a user. */
 	const bearerHeaders = (token: string) =>
 		new Headers({ Authorization: `Bearer ${token}` });
 
@@ -292,6 +296,7 @@ describe("nest authorization e2e: Better Auth access control policies", () => {
 		});
 	});
 
+	/** An organization with an owner and a `member`, both with it as their active organization. */
 	async function organizationWithMember() {
 		const owner = await userWithRole("user");
 		const member = await userWithRole("user");

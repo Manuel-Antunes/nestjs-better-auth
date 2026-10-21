@@ -73,6 +73,7 @@ const RESERVED = new Set([
 	"checkPermission",
 ]);
 
+/** The abilities of a policy: its `actions`, or every action its `statements` grant. Rejects names Nest never treats as abilities. */
 function resolveActions<TRole extends string, TAction extends string>(
 	definition: BetterAuthACPolicyDefinition<TRole, TAction>,
 ): TAction[] {

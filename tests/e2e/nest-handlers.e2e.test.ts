@@ -30,6 +30,7 @@ import {
 } from "../shared/nest-mode.ts";
 import { createTestNestApplication } from "../shared/test-utils.ts";
 
+/** Records the password reset links it is asked to send. */
 @Injectable()
 class TestPasswordResetHandler extends PasswordResetHandler {
 	readonly sent: PasswordResetLink[] = [];
@@ -42,6 +43,7 @@ class TestPasswordResetHandler extends PasswordResetHandler {
 	updatePassword() {}
 }
 
+/** Records the verification links it is asked to send. */
 @Injectable()
 class TestEmailVerificationHandler extends EmailVerificationHandler {
 	readonly sent: EmailVerificationLink[] = [];
@@ -53,6 +55,7 @@ class TestEmailVerificationHandler extends EmailVerificationHandler {
 	}
 }
 
+/** Records the magic links it is asked to send. */
 @Injectable()
 class TestMagicLinkHandler extends MagicLinkHandler {
 	readonly sent: MagicLink[] = [];
@@ -176,6 +179,7 @@ describe("nest handlers e2e: email handlers", () => {
 });
 
 describe("nest handlers e2e: OidcAccountResolver", () => {
+	/** Records what it is asked to resolve, and allows or refuses links as configured. */
 	@Injectable()
 	class TestOidcResolver extends OidcAccountResolver {
 		readonly calls: unknown[][] = [];
@@ -188,6 +192,7 @@ describe("nest handlers e2e: OidcAccountResolver", () => {
 		}
 	}
 
+	/** Links a GitHub account to `userId`, which runs the account `before` hook. */
 	const linkGithub = async (
 		auth: ReturnType<typeof createNestAuth>,
 		userId: string,
@@ -268,6 +273,7 @@ describe("nest handlers e2e: PasswordHasher bridge", () => {
 	const authenticationOptions = { password: { logN: 10 } };
 	const password = "password-123456";
 
+	/** The stored hash of a user's credential account. */
 	const credentialPassword = async (
 		auth: ReturnType<typeof createNestAuth>,
 		userId: string,

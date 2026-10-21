@@ -77,6 +77,7 @@ export function nestPasswordHasher(
 	options: BetterAuthPasswordOptions = {},
 ): BetterAuthPassword {
 	let delegate: BetterAuthPassword | undefined;
+	/** The bound delegate, or a clear error until `BetterAuthAuthenticationModule` binds it. */
 	const bound = (): BetterAuthPassword => {
 		if (!delegate)
 			throw new Error(

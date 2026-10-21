@@ -130,6 +130,7 @@ export class AuthModule
 		});
 	}
 
+	/** Wires `@Hook()` and `@DatabaseHook()` providers into Better Auth's options, once every provider exists. */
 	onModuleInit(): void {
 		this.assertNestAdapters();
 
@@ -210,6 +211,7 @@ export class AuthModule
 			);
 	}
 
+	/** Registers the body parsers, CORS and the Better Auth handler on the HTTP adapter. */
 	configure(consumer: MiddlewareConsumer): void {
 		const adapterType = this.adapter.httpAdapter.getType();
 		const trustedOrigins = this.options.auth.options.trustedOrigins;
@@ -366,6 +368,7 @@ export class AuthModule
 		}
 	}
 
+	/** `forRootAsync()` that also registers the guard (or leaves it to `@nestjs/authentication`) and the authentication mode. */
 	static forRootAsync(options: typeof ASYNC_OPTIONS_TYPE): DynamicModule {
 		const forRootAsyncResult = super.forRootAsync(options);
 		const { module } = forRootAsyncResult;
@@ -443,6 +446,7 @@ function authenticationProviders(
 	];
 }
 
+/** `AuthModule` that registers no middleware, for `disableControllers`. */
 class AuthModuleWithoutControllers extends AuthModule {
 	configure(): void {
 		return;

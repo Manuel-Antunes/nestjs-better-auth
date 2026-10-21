@@ -61,6 +61,7 @@ export class BetterAuthSessionProvider extends AuthenticationProvider<
 		};
 	}
 
+	/** `WWW-Authenticate` challenge sent with a 401 when no provider found credentials. */
 	challenge(): string {
 		return "Cookie";
 	}

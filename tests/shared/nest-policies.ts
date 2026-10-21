@@ -21,6 +21,7 @@ export enum Operations {
 
 export type Post = { id: string; authorId: string };
 
+/** User-scope policy for the `post` resource, with a record-level override of `update`. */
 @Policy()
 export class PostPolicy extends BetterAuthACPolicy<Roles, Operations>({
 	resource: "post",
@@ -38,6 +39,7 @@ export class PostPolicy extends BetterAuthACPolicy<Roles, Operations>({
 	};
 }
 
+/** Organization-scope policy for the `post` resource. */
 @Policy()
 export class PostOrganizationPolicy extends BetterAuthOrganizationACPolicy<
 	Roles,
@@ -61,6 +63,7 @@ export class Clock {
 	}
 }
 
+/** Policy with its own constructor dependency next to the mixin's. */
 @Policy()
 export class ReportPolicy extends BetterAuthACPolicy<Roles, "read">({
 	resource: "report",

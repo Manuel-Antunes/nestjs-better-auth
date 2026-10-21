@@ -85,6 +85,7 @@ export class BetterAuthAccessControl {
 		);
 	}
 
+	/** Collects the discovered policies of `scope` on top of Better Auth's defaults, and builds the `ac` and `roles` from them. */
 	private build(scope: AccessControlScope, base?: Defaults) {
 		const statements: Record<string, string[]> = {};
 		for (const [resource, actions] of Object.entries(base?.statements ?? {})) {

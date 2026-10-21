@@ -75,10 +75,12 @@ export class BetterAuthJwtProvider extends AuthenticationProvider<
 		return { user: user as BetterAuthUser, session: payload };
 	}
 
+	/** `WWW-Authenticate` challenge sent with a 401 when no provider found credentials. */
 	challenge(): string {
 		return 'Bearer realm="api"';
 	}
 
+	/** A 401 for a bearer token that looks like a JWT but did not verify, with the RFC 6750 challenge. */
 	private invalid(description: string): AuthenticationError {
 		return new AuthenticationError(description, {
 			code: "invalid_token",

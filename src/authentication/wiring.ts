@@ -79,6 +79,7 @@ export class BetterAuthNestWiring implements OnModuleInit {
 		private readonly hasher?: PasswordHasher,
 	) {}
 
+	/** Plugs the discovered handlers, the OIDC resolver and the password hasher into Better Auth's configuration. */
 	onModuleInit(): void {
 		this.wireEmailHandlers();
 		this.wireOidc();
@@ -92,6 +93,7 @@ export class BetterAuthNestWiring implements OnModuleInit {
 		return undefined;
 	}
 
+	/** Replaces the password reset, email verification and magic link callbacks with the discovered Nest handlers. */
 	private wireEmailHandlers(): void {
 		const auth = this.options.auth.options as Options;
 
@@ -269,6 +271,7 @@ export class BetterAuthNestWiring implements OnModuleInit {
 			return result;
 		});
 
+		/** Upgrades an outdated credential hash with the plaintext the sign-in just verified. */
 		const rehash = async (
 			adapter: Options,
 			userId: string,
