@@ -12,6 +12,7 @@ import {
 	PasswordResetHandler,
 	type PasswordResetLink,
 } from "@nestjs/authentication";
+import { createAuthMiddleware } from "better-auth/api";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { hashPassword } from "better-auth/crypto";
 import { AuthModule } from "../../src/index.ts";
@@ -132,7 +133,8 @@ describe("nest handlers e2e: email handlers", () => {
 
 		try {
 			const email = uniqueEmail();
-			await auth.api.signInMagicLink({
+			// biome-ignore lint/suspicious/noExplicitAny: the magic-link endpoints are not typed on the generic auth instance
+			await (auth.api as any).signInMagicLink({
 				body: { email },
 				headers: new Headers(),
 			});
@@ -364,6 +366,52 @@ describe("nest handlers e2e: PasswordHasher bridge", () => {
 				.send({ email, password })
 				.expect(200);
 		} finally {
+			await server.app.close();
+		}
+	});
+
+	it("keeps the response an existing hooks.after returns, and never fails sign-in over a rehash error", async () => {
+		const auth = createNestAuth({
+			hooks: {
+				after: createAuthMiddleware(async (ctx) => {
+					if (ctx.path === "/sign-in/email") return ctx.json({ hooked: true });
+				}),
+			},
+			emailAndPassword: { enabled: true, password: nestPasswordHasher() },
+		});
+		const server = await createNestModeApp({
+			auth,
+			controllers: [],
+			authentication: authenticationOptions,
+		});
+
+		try {
+			const ctx = await auth.$context;
+			const email = uniqueEmail();
+			const user = await ctx.internalAdapter.createUser({
+				name: "Legacy",
+				email,
+			});
+			await ctx.internalAdapter.linkAccount({
+				userId: user.id,
+				providerId: "credential",
+				accountId: user.id,
+				password: await hashPassword(password),
+			});
+			// The rehash will fail: the sign-in must still succeed.
+			vi.spyOn(ctx.internalAdapter, "updatePassword").mockRejectedValue(
+				new Error("database is read-only"),
+			);
+
+			const response = await request(server.app.getHttpServer())
+				.post("/api/auth/sign-in/email")
+				.send({ email, password })
+				.expect(200);
+
+			// Better Auth decides how a hook's result is shaped; it must survive the wrapper.
+			expect(JSON.stringify(response.body)).toContain('"hooked":true');
+		} finally {
+			vi.restoreAllMocks();
 			await server.app.close();
 		}
 	});

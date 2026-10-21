@@ -14,6 +14,7 @@ import {
 	MemberHasPermission,
 	OrgRoles,
 	RequireActiveOrg,
+	BetterAuthACPolicy,
 	Roles as RolesDecorator,
 	UserHasPermission,
 	activeOrganization,
@@ -26,6 +27,7 @@ import {
 } from "../shared/nest-mode.ts";
 import {
 	Clock,
+	Roles,
 	type Post as PostRecord,
 	PostOrganizationPolicy,
 	PostPolicy,
@@ -500,6 +502,20 @@ describe("nest authorization e2e: BetterAuthAccessControl", () => {
 		expect(() =>
 			build([{ metatype: PostPolicy }, { metatype: Duplicate }]).admin(),
 		).toThrow(/define resource 'post'/);
+	});
+
+	it("tells apart distinct classes that share a name", () => {
+		const make = () =>
+			class PostPolicy extends BetterAuthACPolicy<Roles, "read">({
+				resource: "article",
+				statements: { [Roles.ADMIN]: ["read"] },
+			}) {};
+		const [first, second] = [make(), make()];
+		expect(first.name).toBe(second.name);
+
+		expect(() =>
+			build([{ metatype: first }, { metatype: second }]).admin(),
+		).toThrow(/define resource 'article'/);
 	});
 
 	it("keeps the same policy registered in two modules", () => {

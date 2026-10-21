@@ -1,4 +1,9 @@
-import { type ExecutionContext, Inject, Injectable } from "@nestjs/common";
+import {
+	type ExecutionContext,
+	Inject,
+	Injectable,
+	Logger,
+} from "@nestjs/common";
 import {
 	ApiKeyProvider,
 	type ApiKeySession,
@@ -33,6 +38,7 @@ type Options = Record<string, any>;
 export class BetterAuthApiKeyProvider extends ApiKeyProvider<BetterAuthUser> {
 	private readonly headerNames: string[];
 	private readonly apiRealm: string;
+	private readonly logger = new Logger(BetterAuthApiKeyProvider.name);
 
 	constructor(
 		@Inject(AuthService) private readonly authService: AuthService,
@@ -78,13 +84,13 @@ export class BetterAuthApiKeyProvider extends ApiKeyProvider<BetterAuthUser> {
 			// Some versions throw for a bad key; a store outage stays a 500.
 			const status = (error as { statusCode?: number })?.statusCode;
 			if (typeof status === "number" && status >= 400 && status < 500) {
-				throw this.invalid((error as Error).message || "Invalid API key");
+				throw this.invalid((error as Error).message);
 			}
 			throw error;
 		}
 		const { valid, error, key: record } = verified;
 		if (!valid || !record) {
-			throw this.invalid(error?.message ?? "Invalid API key");
+			throw this.invalid(error?.message);
 		}
 
 		// `referenceId` since the api-key plugin supports organization-owned keys.
@@ -96,7 +102,7 @@ export class BetterAuthApiKeyProvider extends ApiKeyProvider<BetterAuthUser> {
 
 		const ctx = await this.authService.instance.$context;
 		const user = await ctx.internalAdapter.findUserById(ownerId);
-		if (!user) throw this.invalid("Invalid API key");
+		if (!user) throw this.invalid("API key owner not found");
 
 		return {
 			user: user as BetterAuthUser,
@@ -125,8 +131,13 @@ export class BetterAuthApiKeyProvider extends ApiKeyProvider<BetterAuthUser> {
 		return `ApiKey realm="${this.apiRealm}"`;
 	}
 
-	private invalid(message: string): AuthenticationError {
-		return new AuthenticationError(message, {
+	/**
+	 * One generic message for the client, so it can't tell an expired key from
+	 * a disabled or rate limited one. The reason goes to the server's logs.
+	 */
+	private invalid(reason?: string): AuthenticationError {
+		if (reason) this.logger.debug(`API key refused: ${reason}`);
+		return new AuthenticationError("Invalid API key", {
 			code: "invalid_token",
 			challenge: this.challenge(),
 		});

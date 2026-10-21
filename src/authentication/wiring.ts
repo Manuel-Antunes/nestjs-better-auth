@@ -248,26 +248,43 @@ export class BetterAuthNestWiring implements OnModuleInit {
 
 		const original = hooks.after;
 		hooks.after = createAuthMiddleware(async (ctx) => {
-			if (original) await original(ctx);
-			if (ctx.path !== "/sign-in/email") return;
+			// An `after` hook's return value replaces the endpoint's response.
+			const result = original ? await original(ctx) : undefined;
+			if (ctx.path !== "/sign-in/email") return result;
 
 			const userId = ctx.context.newSession?.user.id;
 			const plaintext = (ctx.body as { password?: unknown } | undefined)
 				?.password;
-			if (!userId || typeof plaintext !== "string") return;
+			if (!userId || typeof plaintext !== "string") return result;
 
-			const accounts = await ctx.context.internalAdapter.findAccounts(userId);
-			const credential = accounts.find((a) => a.providerId === "credential");
+			// The user is already signed in: an outdated hash that can't be
+			// upgraded now must not fail the request.
+			try {
+				await rehash(ctx.context.internalAdapter, userId, plaintext);
+			} catch (error) {
+				this.logger.error(
+					`Could not rehash the password of user ${userId}: ${(error as Error).message}`,
+				);
+			}
+			return result;
+		});
+
+		const rehash = async (
+			adapter: Options,
+			userId: string,
+			plaintext: string,
+		) => {
+			const accounts = await adapter.findAccounts(userId);
+			const credential = accounts.find(
+				(a: Options) => a.providerId === "credential",
+			);
 			const encoded = credential?.password;
 			if (!encoded) return;
 			if (encoded.startsWith("$scrypt$") && !hasher.needsRehash(encoded))
 				return;
 
-			await ctx.context.internalAdapter.updatePassword(
-				userId,
-				await hasher.hash(plaintext),
-			);
-		});
+			await adapter.updatePassword(userId, await hasher.hash(plaintext));
+		};
 	}
 
 	private require(

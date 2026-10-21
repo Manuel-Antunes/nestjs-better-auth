@@ -98,7 +98,8 @@ export class BetterAuthAccessControl {
 			}
 		}
 
-		const seen = new Map<string, string>();
+		// Compared by class: distinct classes can share a name.
+		const seen = new Map<string, { metatype: unknown; name: string }>();
 		for (const { metatype } of this.discovery.getProviders()) {
 			const definition =
 				metatype &&
@@ -108,12 +109,12 @@ export class BetterAuthAccessControl {
 			if (!definition || definition.scope !== scope) continue;
 
 			const owner = seen.get(definition.resource);
-			if (owner && owner !== metatype.name) {
+			if (owner && owner.metatype !== metatype) {
 				throw new Error(
-					`Two ${scope} policies define resource '${definition.resource}': ${owner} and ${metatype.name}.`,
+					`Two ${scope} policies define resource '${definition.resource}': ${owner.name} and ${metatype.name}.`,
 				);
 			}
-			seen.set(definition.resource, metatype.name);
+			seen.set(definition.resource, { metatype, name: metatype.name });
 
 			statements[definition.resource] = [...definition.actions];
 			for (const [role, actions] of Object.entries(definition.statements)) {
